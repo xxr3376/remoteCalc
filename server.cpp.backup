@@ -1,0 +1,68 @@
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+using namespace std;
+
+#define SERV_PORT 3000
+int main(int argc, const char *argv[])
+{
+	int sock_fd;   //套接子描述符号
+	int recv_num;
+	int send_num;
+	int client_len;
+	char recv_buf[1000];
+	struct sockaddr_in addr_serv;
+	struct sockaddr_in addr_client;//服务器和客户端地址
+	sock_fd = socket(AF_INET,SOCK_DGRAM,0);
+	if(sock_fd < 0){
+		perror("socket");
+		exit(1);
+	} else{
+		printf("sock sucessful\n");
+	}
+	//初始化服务器断地址
+	memset(&addr_serv,0,sizeof(struct sockaddr_in));
+	addr_serv.sin_family = AF_INET;//协议族
+	addr_serv.sin_port = htons(SERV_PORT);
+	addr_serv.sin_addr.s_addr = htonl(INADDR_ANY);//任意本地址
+
+	client_len = sizeof(struct sockaddr_in);
+	/*绑定套接子*/
+	if(bind(sock_fd,(struct sockaddr *)&addr_serv,sizeof(struct sockaddr_in))<0 ){
+		perror("bind");
+		exit(1);
+	} else{
+
+		printf("bind sucess\n");
+	}
+	char temp[1000];
+	char outputBuffer[1000];
+	while (1){
+		printf("server is ready:\n");
+		sprintf(temp, "echo \"%s\" | bc", argv[1]);
+		recv_num = recvfrom(sock_fd,recv_buf,sizeof(recv_buf),0,(struct sockaddr *)&addr_client,(socklen_t *)&client_len);
+		if(recv_num <  0){
+			printf("bad receive\n");
+			continue;
+		} else{
+			recv_buf[recv_num]='\0';
+			sprintf(temp, "echo \"%s\" | bc", recv_buf);
+			FILE *fp = popen(temp, "r");
+			fscanf(fp, "%s", outputBuffer);
+			int send_num = sendto(sock_fd,outputBuffer,sizeof(outputBuffer),0,(struct sockaddr *)&addr_client, client_len);
+			if (send_num < 0){
+				printf("bad send");
+				continue;
+			}
+			printf("result : %s\n", outputBuffer);
+		}
+	}
+	close(sock_fd);
+	return 0;
+}
